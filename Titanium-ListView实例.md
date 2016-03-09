@@ -1,8 +1,8 @@
 
 # Titanium-ListView实例 
-## 功能
+## 使用到的组件以及实现的功能
 - ListView
-- pull to refresh
 - collections and model
+- pull to refresh
 
 
