@@ -15,6 +15,82 @@
 
 ## 实例功能
 
+##步骤
++ 新建工程
++ 在Terminal中输入gittio install nl.fokkezb.pullToRefresh，安装下拉刷新插件;
++ 创建导航栏
+  + 修改index.xml
+  ``` xml
+  <Alloy>
+	<Window id="win" class="container" platform="android">
+		<Button id="label" onClick="doClick">Home</Button>
+	</Window>
+	<NavigationWindow id="nav" platform="ios" class="container">
+		<Window id="win" class="container">
+			<Button id="label" onClick="doClick">Home</Button>
+		</Window>
+	</NavigationWindow>
+  </Alloy>
+  ```
+  + 修改index.js
+  ```javascript
+ 
+    Alloy.Globals.Navigator = {
+	
+    	open: function(controller, payload){
+    		var win = Alloy.createController(controller, payload || {}).getView();
+    		
+    		if(OS_IOS){
+    			$.nav.openWindow(win);
+    		}
+    		else if(OS_MOBILEWEB){
+    			$.nav.open(win);
+    		}
+    		else {
+    			
+    			// added this property to the payload to know if the window is a child
+    			if (payload.displayHomeAsUp){
+    				
+    				win.addEventListener('open',function(evt){
+    					var activity=win.activity;
+    					activity.actionBar.displayHomeAsUp=payload.displayHomeAsUp;
+    					activity.actionBar.onHomeIconItemSelected=function(){
+    						evt.source.close();
+    					};
+    				});
+    			}
+    			win.open();
+    		}
+    	}
+    };
+    
+    function doClick(e) {
+       Alloy.Globals.Navigator.open("detail", {displayHomeAsUp:true});
+    }
+    if(OS_ANDROID) {
+    	$.win.open();
+    } else {
+    	$.nav.open();
+    }
+
+  ```
+  + 创建detail.xml
+  ``` xml
+  <Alloy>
+	<Window id="win" class="container" title="index">
+		<ActionBar platfor="android" displayHomeAsUp="true" onHomeIconItemSelected="closeWindow" />
+	</Window>
+  </Alloy>
+  ```
+  + 创建detail.js
+  ``` javascript
+    function closeWindow(){
+      $.win.close();
+    }
+  ```
++ 创建ListView
++ 创建Model、Collection
+
 ## 使用到的组件以及实现的功能
 - ListView
 - collections and model
