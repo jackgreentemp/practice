@@ -20,6 +20,7 @@
 + ListView 分页显示
 + ListView 绑定 Collection
 + ListView基于model自动更新
+
 ![list](https://github.com/jackgreentemp/practice/blob/master/list.gif)
 
 ##步骤
