@@ -20,6 +20,7 @@
 + ListView 分页显示
 + ListView 绑定 Collection
 + ListView基于model自动更新
+![list](https://github.com/jackgreentemp/practice/blob/master/list.gif)
 
 ##步骤
 + 新建工程
@@ -95,7 +96,7 @@
     }
   ```
 + 创建ListView
-    + 修改index.xml
+    + 修改index.xml，使用require方式引入list.js
   ``` xml
   <Alloy>
 	<Require id="index" src="list" platform="android" /> 
@@ -149,7 +150,7 @@
     }
     
   ```
-    + 创建list.xml
+    + 创建list.xml，标签方式实例化Collection，引入下拉刷新widget
   ``` xml
   <Alloy>
 	<Collection src="myCollection"/>
@@ -172,7 +173,7 @@
 	</Window>
   </Alloy>
   ```    
-    + 创建list.js
+    + 创建list.js，这是本例的核心文件，由于没有服务器接口，所以使用本地创建样例数据，思路就是查本地数据，如果本地数据为空，则新建10条数据；注意ListView的更新都是依赖于Collection的变化；并且使用onMarkerEvent来进行分页显示，具体的方式参见代码；
   ``` javascript
     var collection = Alloy.Collections.myCollection;
     var moment = require('alloy/moment');
@@ -293,7 +294,7 @@
 	</Window>
   </Alloy>
   ```
-    + 创建detail.js
+    + 创建detail.js，接收list.js传递进来的model，并获取相应的数据赋值给UI，在“修改”按钮的监听中，修改model中image地址，保存model后，关闭detail.js，发现ListView的图片也自动更新了。
   ```javascript
     var args = arguments[0] || {};
     
