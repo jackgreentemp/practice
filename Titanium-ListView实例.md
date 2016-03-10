@@ -14,6 +14,12 @@
 - 如果需求是更新数据：已服务器返回的数据部分作为关键字，查询Collections，返回该数据对应的model，然后使用model.set(newDataObj).save()，这样就实现了数据更新和ListView刷新。
 
 ## 实例功能
+实例包括两个页面，首页面主要控件为ListView，每一个ListItem包含一个Label和一个ImageView，点击Item，跳转到次页面（将model传给此页面），除了上述的Label和ImageView，此页面包括一个按钮，点击该按钮修改model中image地址，保存后关闭次页面，主页面中对应的Item的图片已更新。
++ Navigtor导航
++ ListView 下拉刷新
++ ListView 分页显示
++ ListView 绑定 Collection
++ ListView基于model自动更新
 
 ##步骤
 + 新建工程
@@ -89,6 +95,229 @@
     }
   ```
 + 创建ListView
+    + 修改index.xml
+  ``` xml
+  <Alloy>
+	<Require id="index" src="list" platform="android" /> 
+	<NavigationWindow id="nav" platform="ios" class="container">
+		<Require src="list"/>
+	</NavigationWindow>
+  </Alloy>
+  ```    
+    + 修改inde.js
+    ```javascript
+    /**
+     * Global Navigation Handler
+     */
+    Alloy.Globals.Navigator = {
+    	
+    	open: function(controller, payload){
+    		var win = Alloy.createController(controller, payload || {}).getView();
+    		
+    		if(OS_IOS){
+    			$.nav.openWindow(win);
+    		}
+    		else if(OS_MOBILEWEB){
+    			$.nav.open(win);
+    		}
+    		else {
+    			
+    			// added this property to the payload to know if the window is a child
+    			if (payload.displayHomeAsUp){
+    				
+    				win.addEventListener('open',function(evt){
+    					var activity=win.activity;
+    					activity.actionBar.displayHomeAsUp=payload.displayHomeAsUp;
+    					activity.actionBar.onHomeIconItemSelected=function(){
+    						evt.source.close();
+    					};
+    				});
+    			}
+    			win.open();
+    		}
+    	}
+    };
+    
+    function doClick(e) {
+       Alloy.Globals.Navigator.open("detail", {displayHomeAsUp:true});
+    }
+    
+    if(OS_ANDROID) {
+    	$.index.getView().open();
+    } else {
+    	$.nav.open();
+    }
+    
+    ```
+    + 创建list.xml
+  ``` xml
+  <Alloy>
+	<Collection src="myCollection"/>
+	<Window id="win" class="container">
+		<Widget id="ptr" src="nl.fokkezb.pullToRefresh" onRelease="myRefresher">
+			<ListView id="list" defaultItemTemplate="defaultItem" onMarker="onMarkerEvent">
+				<Templates>
+					<ItemTemplate name="defaultItem" height="Titanium.UI.SIZE">
+						<View class='v_0'>
+							<Label bindId="testDate" class="testDate" />
+							<ImageView bindId="webView" class="w_1"></ImageView>
+						</View>
+					</ItemTemplate>
+				</Templates>
+				<ListSection id="section" dataCollection="myCollection" dataTransform="doTransform">
+					<ListItem class="item" dataid:text="{id}" testDate:text="{testDate}" webView:image="{image}"/>
+				</ListSection>
+			</ListView>
+		</Widget>
+	</Window>
+  </Alloy>
+  ```    
+    + 创建list.js
+    ``` javascript
+    var collection = Alloy.Collections.myCollection;
+    var moment = require('alloy/moment');
+    var table = collection.config.adapter.collection_name;
+    Ti.API.info("table=", table);
+    var uid = 1;//不知道为什么不能是string格式，否则ios query时会出问题
+    
+    //listview滑动到底部，查询数据，更新listview
+    function onMarkerEvent(e) {
+    	var oldLength = _.size(collection);
+    	Ti.API.info("oldLength = ", oldLength);
+    	collection.fetch({query: {statement: 'SELECT * from ' + table + ' where uid = ?' + ' ORDER BY testDate DESC limit 0, ' + (oldLength+10), params: [uid]}});
+    	var newLength = _.size(collection);
+    	Ti.API.info("newLength = ", newLength);
+    	
+    	if(newLength == oldLength){//sql中无新数据了
+    		addDatasToCollection();//TODO 使用网络请求获取新参数
+    	}
+    	
+    	//更新marker索引，如果是网络请求中的，需要在网络请求callback中更新marker索引
+    	$.list.setMarker({
+    		sectionIndex:0,
+    		itemIndex:$.list.sections[0].items.length - 1
+    	});
+    }
+    
+    //整理template中的参数
+    function doTransform(model){
+    	var obj = model.toJSON();
+    	obj.testDate = "id=" + obj.id + ", " + obj.testDate;
+    	return obj;
+    }
+    
+    //为Collection新增数据
+    function addDatasToCollection(){
+    	var i;
+    	for(i=1;i<=10;i++){
+    		var obj = {
+    			uid: 1,
+    		    testDate: ''+moment().format('YYYY-MM-DD HH:mm:ss'),
+    		    image: 'http://www.photography-match.com/views/images/gallery/Uluru_Kata_Tjuta_National_Park_Australia.jpg',
+    		};
+    		
+    		var model = Alloy.createModel('myCollection', obj);
+    		
+    		collection.add(model);
+    		
+    		model.save();
+    	}
+    }
+    
+    //初始化
+    function init(){
+    	//查询数据
+    	collection.fetch({query: { statement: 'SELECT * from ' + table + ' where uid = ?' + ' ORDER BY testDate DESC limit 0,10', params: [uid]}});
+    	
+    	//如果数据库无数据，新增一些数据
+    	if(_.size(collection) === 0){
+    		addDatasToCollection();
+    	}
+    	
+    	//更新marker索引
+        $.list.setMarker({
+    		sectionIndex:0,
+    		itemIndex:$.list.sections[0].items.length - 1
+    	});
+    }
+    
+    //先open window，再执行初始化
+    $.win.addEventListener("open", function(){
+        init();
+    });
+    
+    //销毁，避免内存溢出
+    $.win.addEventListener("close", function(){
+        $.destroy();
+    });
+    
+    //下拉刷新执行的函数
+    function myRefresher(e) {
+    	init();
+    	e.hide();
+    }
+    
+    /*
+     * listView 点击监听 
+     */
+    $.list.addEventListener('itemclick', function(e){
+    	
+    	//取消 listView点击后选中状态
+        var item = e.section.getItemAt(e.itemIndex);
+        e.section.updateItemAt(e.itemIndex, item);
+        
+    	var dataid = e.section.items[e.itemIndex].dataid.text;//根据item索引查找dataid
+    
+    	var data = collection.get(dataid);//根据dataid获取数据模型
+    	
+    	// Ti.API.info("item data =", data);
+    	
+    	Alloy.Globals.Navigator.open("detail", {displayHomeAsUp:true, data: data});
+    		
+    });
+
+    ```
+    
+    + 创建detail.xml
+  ``` xml
+  <Alloy>
+	<Collection src="myCollection"/>
+	<Window id="win" class="container" title="index" layout="vertical">
+		<ActionBar platfor="android" displayHomeAsUp="true" onHomeIconItemSelected="closeWindow" />
+			<View class='v_0'>
+				<Label id="data_id"></Label>
+				<Label class="testDate" id="testDate"/>
+				<ImageView class="w_1" id="image"></ImageView>
+			</View>
+			<Button id="btn_edit" onClick="edit" top="50">修改</Button>
+	</Window>
+  </Alloy>
+  ```
+    + 创建detail.js
+    ```javascript
+    var args = arguments[0] || {};
+    
+    function init() {
+    	Ti.API.info("args = ", args.data.toJSON());
+    	$.data_id.text = "id=" + args.data.toJSON().id;
+    	$.testDate.text = args.data.toJSON().testDate;
+    	$.image.image = args.data.toJSON().image;
+    }
+    
+    function closeWindow(){
+    	$.win.close();
+    }
+    
+    function edit() {
+    	var model = args.data;//获取model
+    	var obj = model.toJSON();//model转为object
+    	obj.image = 'http://image.tianjimedia.com/uploadImages/2013/105/414UWER6711T.jpg';//修改image地址
+    	$.image.image = obj.image;//更新UI
+    	model.set(obj).save();//更新model并保存，自动刷新list.js的UI
+    }
+    
+    init();    
+    ```
 + 创建Model、Collection
 
 ## 使用到的组件以及实现的功能
